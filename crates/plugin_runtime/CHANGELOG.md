@@ -6,6 +6,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.7](https://github.com/farm-fe/farm/compare/farmfe_plugin_runtime-v0.0.6...farmfe_plugin_runtime-v0.0.7) - 2024-05-28
+
+### Added
+- support exclude/include option for html ([#1319](https://github.com/farm-fe/farm/pull/1319))
+- support obj external & dts support resolvedPaths ([#1282](https://github.com/farm-fe/farm/pull/1282))
+
+### Fixed
+- minify not work ([#1317](https://github.com/farm-fe/farm/pull/1317))
+- external inject logic ([#1313](https://github.com/farm-fe/farm/pull/1313))
+- cache issues ([#1301](https://github.com/farm-fe/farm/pull/1301))
+
+## [0.0.6](https://github.com/farm-fe/farm/compare/farmfe_plugin_runtime-v0.0.5...farmfe_plugin_runtime-v0.0.6) - 2024-05-09
+
+### Added
+- support lazy compilation when targeting node ([#1035](https://github.com/farm-fe/farm/pull/1035))
+- support top level await ([#1202](https://github.com/farm-fe/farm/pull/1202))
+
+### Fixed
+- circle module require ([#1290](https://github.com/farm-fe/farm/pull/1290))
+- minify module filter use absolute path ([#1259](https://github.com/farm-fe/farm/pull/1259))
+- vite migrations bugs ([#1236](https://github.com/farm-fe/farm/pull/1236))
+
+### Other
+- Fix/lazy compilation ([#1253](https://github.com/farm-fe/farm/pull/1253))
+- update swc to v0.90 ([#1227](https://github.com/farm-fe/farm/pull/1227))
+- add ssr e2e tests ([#1201](https://github.com/farm-fe/farm/pull/1201))
+
 ## [0.0.5](https://github.com/farm-fe/farm/compare/farmfe_plugin_runtime-v0.0.4...farmfe_plugin_runtime-v0.0.5) - 2024-04-13
 
 ### Other

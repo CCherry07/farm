@@ -1,10 +1,10 @@
+import fs from 'node:fs';
 /* eslint-disable no-prototype-builtins */
 import os from 'node:os';
-import fs from 'node:fs';
-import readline from 'node:readline';
 import path, { dirname } from 'node:path';
+import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
-import { Config } from '../../binding/index.js';
+import { Config } from '../types/binding.js';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore import packageJson from '../../package.json';
 

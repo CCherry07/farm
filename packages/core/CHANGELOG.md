@@ -1,5 +1,120 @@
 # @farmfe/core
 
+## 1.1.13
+
+### Patch Changes
+
+- 34336080: chore(refactor): optimize tree shake implemetation to improve performance
+- d9cb6902: fix: encode the lazy compile path
+- c2c6717c: fix failed fetch resource
+
+## 1.1.12
+
+### Patch Changes
+
+- 0f3c1a8f: fix: can't match resources with url parameters carried under devServer
+
+## 1.1.11
+
+### Patch Changes
+
+- 91f897b2: fix: format error message and fix output.targetEnv schema validate
+- f0f42b27: - core types should be included in the compilation process
+  - logger used should be obtained from the parameter
+
+## 1.1.10
+
+### Patch Changes
+
+- 0c3f6883: make `server.proxy.headers` work again
+
+## 1.1.9
+
+### Patch Changes
+
+- 3059e616: check config stage
+
+## 1.1.8
+
+### Patch Changes
+
+- 1ae36c95: support exclude/include option for html
+
+## 1.1.7
+
+### Patch Changes
+
+- 943fd627: fix: load env file error
+- 8d5bf9cd: fix minify not work for files that endsWith .min.js
+- 19b5d89b: 1. external injectlogic 2. better tip
+
+## 1.1.6
+
+### Patch Changes
+
+- bf98b34a: fix publish cannot find type
+
+## 1.1.5
+
+### Patch Changes
+
+- 25ed2330: Bugfixes:
+  - #1300
+  - #1288
+  - #1271
+- df7ac2a0: support record external
+
+## 1.1.4
+
+### Patch Changes
+
+- be4415a7: fix circle module require
+
+## 1.1.3
+
+### Patch Changes
+
+- 9754d371: merge configuration policies
+- 61294219: minify module filter use absolute path
+- 28e1a373: fix(vite plugin): some vite plugins do not provide `alias` configuration errors
+
+## 1.1.2
+
+### Patch Changes
+
+- 492353f8: fix: lazy compilation concurrency issue
+- 5b75ec27: feat: support isolate runtime resource
+- 8a79de4d: fix: format watch mode error message
+- Updated dependencies [492353f8]
+  - @farmfe/runtime-plugin-hmr@3.5.2
+  - @farmfe/runtime@0.11.1
+
+## 1.1.1
+
+### Patch Changes
+
+- 67716076: \* added `persistentCache.globalBuiltinCacheKeyStrategy` to control internal persistent cache key, #1208
+  - fix define string #1112
+  - fix css @import without .css suffix #1230
+  - fix json transform #1231
+
+## 1.1.0
+
+### Minor Changes
+
+- 71b6bab7: feat: disable polyfill when entry is not html
+- ef1b39bc: Top level await supported
+- 86d17342: Bump swc core version to v0.90
+
+### Patch Changes
+
+- 3581ee5e: Support lazy compilation when targeting node
+- 4e8ebbcc: support cli root path options
+- Updated dependencies [ef1b39bc]
+  - @farmfe/runtime@0.11.0
+  - @farmfe/runtime-plugin-hmr@3.5.1
+  - @farmfe/runtime-plugin-import-meta@0.2.0
+
 ## 1.0.22
 
 ### Patch Changes

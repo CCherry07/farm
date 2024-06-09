@@ -3,6 +3,7 @@
   "version": "0.0.2",
   "private": true,
   "dependencies": {
+    "@farmfe-examples/lib-for-browser": "workspace:^",
     "@ant-design/icons": "^5.0.1",
     "antd": "^5.4.2",
     "clsx": "^1.2.1",
@@ -15,8 +16,8 @@
     "@farmfe/cli": "workspace:*",
     "@farmfe/core": "workspace:*",
     "@farmfe/js-plugin-sass": "workspace:*",
-    "@farmfe/plugin-react": "workspace:^1.0.1",
-    "@farmfe/plugin-sass": "workspace:^1.0.4",
+    "@farmfe/plugin-react": "workspace:^1.1.0",
+    "@farmfe/plugin-sass": "workspace:^1.0.5",
     "@types/react": "18",
     "@types/react-dom": "18",
     "axios": "^1.6.5",

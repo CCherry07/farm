@@ -9,7 +9,7 @@ export default defineConfig(() => {
   return {
     // root: path.resolve(process.cwd(), './html'),
     compilation: {
-      sourcemap: false,
+      sourcemap: true,
       persistentCache: false,
       presetEnv: false,
       progress: false,
@@ -27,7 +27,7 @@ export default defineConfig(() => {
       }
     },
     plugins: [
-      ['@farmfe/plugin-react', { runtime: 'automatic' }],
+      '@farmfe/plugin-react',
       '@farmfe/plugin-sass'
     ]
   };

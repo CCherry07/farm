@@ -1,13 +1,16 @@
-import { Middleware, Context, Next } from 'koa';
-import { Server } from '../index.js';
-import serve from 'koa-static';
-import path from 'path';
 import fs from 'fs';
+import path from 'path';
+import { Context, Middleware, Next } from 'koa';
+import serve from 'koa-static';
+import { Server } from '../index.js';
 
 export function staticMiddleware(devServerContext: Server): Middleware {
   const { config } = devServerContext;
 
-  const staticMiddleware = serve(config.distDir);
+  const staticMiddleware = serve(config.distDir, {
+    // multiple page maybe receive "about", should auto try extension
+    extensions: ['html']
+  });
 
   // Fallback
   const fallbackMiddleware: Middleware = async (ctx: Context, next: Next) => {

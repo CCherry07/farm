@@ -1,14 +1,13 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { Logger } from '../utils/logger.js';
 import { Compiler as BindingCompiler } from '../../binding/index.js';
 
+import type { Resource } from '../index.js';
+import type { Config, JsUpdateResult } from '../types/binding.js';
 import type { ILogger } from '../utils/logger.js';
-import type { Config, JsUpdateResult } from '../../binding/index.js';
-import { JsPlugin, Resource } from '../index.js';
 
-export const VIRTUAL_FARM_DYNAMIC_IMPORT_PREFIX =
-  'virtual:FARMFE_DYNAMIC_IMPORT:';
+export const VIRTUAL_FARM_DYNAMIC_IMPORT_SUFFIX =
+  '.farm_dynamic_import_virtual_module';
 
 /**
  * Cause the update process is async, we need to keep the update queue to make sure the update process is executed in order.
@@ -37,10 +36,10 @@ export class Compiler {
 
   public compiling = false;
 
-  private logger: ILogger;
-
-  constructor(public config: Config) {
-    this.logger = new Logger();
+  constructor(
+    public config: Config,
+    private logger: ILogger
+  ) {
     this._bindingCompiler = new BindingCompiler(this.config);
   }
 
@@ -78,7 +77,8 @@ export class Compiler {
   async update(
     paths: string[],
     sync = false,
-    ignoreCompilingCheck = false
+    ignoreCompilingCheck = false,
+    generateUpdateResource = true
   ): Promise<JsUpdateResult> {
     let resolve: (res: JsUpdateResult) => void;
 
@@ -100,7 +100,12 @@ export class Compiler {
           const next = this._updateQueue.shift();
 
           if (next) {
-            await this.update(next.paths, true, true).then(next.resolve);
+            await this.update(
+              next.paths,
+              true,
+              true,
+              generateUpdateResource
+            ).then(next.resolve);
           } else {
             this.compiling = false;
             for (const cb of this._onUpdateFinishQueue) {
@@ -110,7 +115,8 @@ export class Compiler {
             this._onUpdateFinishQueue = [];
           }
         },
-        sync
+        sync,
+        generateUpdateResource
       );
 
       return res as JsUpdateResult;
@@ -170,7 +176,7 @@ export class Compiler {
 
   callWriteResourcesHook() {
     for (const jsPlugin of this.config.jsPlugins ?? []) {
-      (jsPlugin as JsPlugin).writeResources?.executor?.({
+      jsPlugin.writeResources?.executor?.({
         resourcesMap: this._bindingCompiler.resourcesMap() as Record<
           string,
           Resource
@@ -198,8 +204,8 @@ export class Compiler {
   }
 
   transformModulePath(root: string, p: string): string {
-    if (p.startsWith(VIRTUAL_FARM_DYNAMIC_IMPORT_PREFIX)) {
-      return p.slice(VIRTUAL_FARM_DYNAMIC_IMPORT_PREFIX.length);
+    if (p.endsWith(VIRTUAL_FARM_DYNAMIC_IMPORT_SUFFIX)) {
+      p = p.slice(0, -VIRTUAL_FARM_DYNAMIC_IMPORT_SUFFIX.length);
     }
 
     if (path.isAbsolute(p)) {

@@ -1,15 +1,19 @@
 #!/usr/bin/env node
-import prompts from 'prompts';
-import minimist from 'minimist';
-import path from 'node:path';
 import fs from 'node:fs';
+import path from 'node:path';
+import minimist from 'minimist';
+import prompts from 'prompts';
 
 import { fileURLToPath } from 'node:url';
 import { colors } from './utils/color.js';
 
-import { loadWithRocketGradient } from './utils/gradient.js';
 import createSpawnCmd from './utils/createSpawnCmd.js';
-import { shouldUseYarn, shouldUsePnpm } from './utils/packageManager.js';
+import { loadWithRocketGradient } from './utils/gradient.js';
+import { shouldUsePnpm, shouldUseYarn } from './utils/packageManager.js';
+import {
+  frameworkPromptsChoices,
+  getSubFrameworkPromptsChoices
+} from './utils/prompts.js';
 
 interface IResultType {
   packageName?: string;
@@ -19,6 +23,7 @@ interface IResultType {
   autoInstall?: boolean;
   packageManager?: string;
 }
+
 // judge node version
 judgeNodeVersion();
 
@@ -80,24 +85,7 @@ async function createFarm() {
           name: 'framework',
           message: 'Select a framework:',
           initial: 0,
-          choices: [
-            {
-              title: colors.cyan('React'),
-              value: 'react'
-            },
-            { title: colors.green('Vue'), value: 'vue' },
-            {
-              title: colors.cyan('Preact'),
-              value: 'preact'
-            },
-            { title: colors.blue('Solid'), value: 'solid' },
-            { title: colors.orange('Svelte'), value: 'svelte' },
-            {
-              title: colors.yellow('Vanilla'),
-              value: 'vanilla'
-            },
-            { title: colors.red('Lit'), value: 'lit' }
-          ]
+          choices: frameworkPromptsChoices
         },
         {
           type: pkgInfo || skipInstall ? null : 'select',
@@ -129,9 +117,13 @@ async function createFarm() {
     return;
   }
   const { framework = argFramework, packageManager } = result;
+  const frameworkPrompts = getSubFrameworkPromptsChoices(framework);
+  const options = await prompts(frameworkPrompts as any);
 
   await copyTemplate(targetDir, {
-    framework,
+    framework: options.subFramework
+      ? `${framework}/${options.subFramework}`
+      : framework,
     projectName: targetDir,
     packageManager
   });

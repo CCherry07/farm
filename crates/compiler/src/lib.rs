@@ -17,7 +17,7 @@ use farmfe_core::{
 };
 
 pub use farmfe_plugin_css::FARM_CSS_MODULES_SUFFIX;
-pub use farmfe_plugin_lazy_compilation::DYNAMIC_VIRTUAL_PREFIX;
+pub use farmfe_plugin_lazy_compilation::DYNAMIC_VIRTUAL_SUFFIX;
 pub use farmfe_plugin_runtime::RUNTIME_SUFFIX;
 
 pub mod build;
@@ -65,6 +65,7 @@ impl Compiler {
 
     if config.minify.enabled() {
       plugins.push(Arc::new(farmfe_plugin_minify::FarmPluginMinify::new(&config)) as _);
+      plugins.push(Arc::new(farmfe_plugin_html::FarmPluginMinifyHtml::new(&config)) as _);
     }
 
     if config.preset_env.enabled() {
@@ -127,7 +128,20 @@ impl Compiler {
     {
       #[cfg(feature = "profile")]
       farmfe_core::puffin::profile_scope!("Build Stage");
+      // let write_module_cache = || {
+      //   if self.context.config.persistent_cache.enabled() {
+      //     self.context.cache_manager.module_cache.write_cache();
+      //   }
+      // };
       self.build()?;
+      // .map(|v| {
+      //   write_module_cache();
+      //   v
+      // })
+      // .map_err(|err| {
+      //   write_module_cache();
+      //   err
+      // })?;
     }
 
     {
@@ -171,6 +185,7 @@ impl Compiler {
 fn write_cache(context: Arc<CompilationContext>) {
   farm_profile_function!("write_cache".to_string());
   context.cache_manager.write_cache();
+  context.cache_manager.custom.write_manifest();
 }
 
 pub fn write_cache_async(context: Arc<CompilationContext>) {

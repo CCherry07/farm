@@ -103,26 +103,48 @@ impl Plugin for FarmPluginCssResolve {
       }));
     } else if matches!(param.kind, ResolveKind::CssAtImport | ResolveKind::CssUrl) {
       // if dep starts with '~', means it's from node_modules.
-      // otherwise it's always relative
       let source = if let Some(striped_source) = param.source.strip_suffix('~') {
         striped_source.to_string()
-      } else if !param.source.starts_with('.') {
-        format!("./{}", param.source)
       } else {
         param.source.clone()
       };
+      // fix #1230
+      let css_suffix = ".css";
+      let extensions = if matches!(param.kind, ResolveKind::CssAtImport) && !source.contains('.') {
+        vec![css_suffix, ""]
+      } else {
+        vec![""]
+      };
+      let resolve_css = |source: String| {
+        for ext in &extensions {
+          let source = format!("{source}{ext}");
+          if let Ok(Some(res)) = context.plugin_driver.resolve(
+            &PluginResolveHookParam {
+              source,
+              ..param.clone()
+            },
+            context,
+            &PluginHookContext {
+              caller: Some("FarmPluginCss".to_string()),
+              meta: Default::default(),
+            },
+          ) {
+            return Some(res);
+          }
+        }
 
-      return context.plugin_driver.resolve(
-        &PluginResolveHookParam {
-          source,
-          ..param.clone()
-        },
-        context,
-        &PluginHookContext {
-          caller: Some("FarmPluginCss".to_string()),
-          meta: Default::default(),
-        },
-      );
+        None
+      };
+      // try relative path first
+      if !source.starts_with('.') {
+        if let Some(res) = resolve_css(format!("./{}", source)) {
+          return Ok(Some(res));
+        }
+      }
+      // try original source in case it's in node_modules.
+      if let Some(res) = resolve_css(source) {
+        return Ok(Some(res));
+      }
     }
 
     Ok(None)
@@ -332,7 +354,7 @@ impl Plugin for FarmPluginCss {
         );
 
         // collapse sourcemap chain
-        if param.source_map_chain.len() > 0 {
+        if !param.source_map_chain.is_empty() {
           let source_map_chain = param
             .source_map_chain
             .iter()
@@ -499,7 +521,7 @@ impl Plugin for FarmPluginCss {
         .config
         .minify
         .clone()
-        .map(|val| MinifyOptions::from(val))
+        .map(MinifyOptions::from)
         .unwrap_or_default();
       let filter = PathFilter::new(&minify_options.include, &minify_options.exclude);
       let source_map_enabled = context.config.sourcemap.enabled(resource_pot.immutable);
@@ -557,7 +579,7 @@ impl Plugin for FarmPluginCss {
           } else {
             None
           },
-          minify_enabled,
+          context.config.minify.enabled(),
         );
 
         rendered_modules.lock().push(RenderedModule {
@@ -565,7 +587,7 @@ impl Plugin for FarmPluginCss {
           rendered_length: css_code.len(),
           original_length: module.size,
           rendered_content: Arc::new(css_code),
-          rendered_map: src_map.map(|s| Arc::new(s)),
+          rendered_map: src_map.map(Arc::new),
         });
 
         Ok::<(), CompilationError>(())

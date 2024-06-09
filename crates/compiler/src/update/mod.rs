@@ -9,7 +9,6 @@ use farmfe_core::{
   error::CompilationError,
   module::{
     module_graph::ModuleGraphEdgeDataItem, module_group::ModuleGroupId, Module, ModuleId,
-    ModuleType,
   },
   plugin::{PluginResolveHookParam, ResolveKind, UpdateResult, UpdateType},
   resource::ResourceType,
@@ -76,10 +75,13 @@ impl Compiler {
     paths: Vec<(String, UpdateType)>,
     callback: F,
     sync: bool,
+    generate_update_resource: bool,
   ) -> Result<UpdateResult>
   where
     F: FnOnce() + Send + Sync + 'static,
   {
+    // mark the compilation as update
+    self.context.set_update();
     let (err_sender, err_receiver) = Self::create_thread_channel();
     let update_context = Arc::new(UpdateContext::new());
 
@@ -260,8 +262,10 @@ impl Compiler {
     });
     let (immutable_resources, mutable_resources) = if should_reload_page {
       ("window.location.reload()".to_string(), "{}".to_string())
-    } else {
+    } else if generate_update_resource {
       render_and_generate_update_resource(&updated_module_ids, &diff_result, &self.context)?
+    } else {
+      ("{}".to_string(), "{}".to_string())
     };
 
     // find the boundaries.
@@ -571,27 +575,16 @@ impl Compiler {
       let resource_pot_map = self.context.resource_pot_map.read();
       let resources_map = self.context.resources_map.lock();
       let module_graph = self.context.module_graph.read();
-      let html_entries_ids = module_graph
-        .entries
-        .clone()
-        .into_iter()
-        .filter_map(|(m, _)| {
-          let module = module_graph.module(&m).unwrap();
-          if matches!(module.module_type, ModuleType::Html) {
-            Some(m)
-          } else {
-            None
-          }
-        })
-        .collect::<Vec<_>>();
+
       let mut dynamic_resources = HashMap::new();
 
-      for html_entry_id in html_entries_ids {
+      for entry_id in module_graph.entries.keys() {
         dynamic_resources.extend(get_dynamic_resources_map(
           &module_group_graph,
-          &html_entry_id,
+          entry_id,
           &resource_pot_map,
           &resources_map,
+          &module_graph,
         ));
       }
 

@@ -6,7 +6,7 @@ use std::{
 use farmfe_core::{
   cache::cache_store::CacheStoreKey,
   cache_item,
-  config::minify::{MinifyMode, MinifyOptions},
+  config::minify::MinifyMode,
   context::CompilationContext,
   deserialize,
   enhanced_magic_string::{
@@ -20,7 +20,7 @@ use farmfe_core::{
   resource::resource_pot::{RenderedModule, ResourcePot},
   serialize,
 };
-use farmfe_toolkit::common::PathFilter;
+use farmfe_toolkit::common::MinifyBuilder;
 use farmfe_utils::hash::sha256;
 
 use self::render_module::{render_module, RenderModuleResult};
@@ -56,18 +56,13 @@ pub fn resource_pot_to_runtime_object(
   context: &Arc<CompilationContext>,
 ) -> Result<RenderedJsResourcePot> {
   let modules = Mutex::new(vec![]);
-  let minify_options = context
-    .config
-    .minify
-    .clone()
-    .map(|val| MinifyOptions::from(val))
-    .unwrap_or_default();
-  let path_filter = PathFilter::new(&minify_options.include, &minify_options.exclude);
 
-  let minify_enabled =
-    matches!(minify_options.mode, MinifyMode::Module) && context.config.minify.enabled();
-  let is_enabled_minify =
-    |module_id: &ModuleId| minify_enabled && path_filter.execute(module_id.relative_path());
+  let minify_builder =
+    MinifyBuilder::create_builder(&context.config.minify, Some(MinifyMode::Module));
+
+  let is_enabled_minify = |module_id: &ModuleId| {
+    minify_builder.is_enabled(&module_id.resolved_path(&context.config.root))
+  };
 
   resource_pot
     .modules()
@@ -86,9 +81,10 @@ pub fn resource_pot_to_runtime_object(
           name: m_id.to_string() + "-resource_pot_to_runtime_object",
           key: sha256(
             format!(
-              "resource_pot_to_runtime_object_{}_{}",
+              "resource_pot_to_runtime_object_{}_{}_{}",
               content_hash,
-              m_id.to_string()
+              m_id.to_string(),
+              module.used_exports.join(",")
             )
             .as_bytes(),
             32,
@@ -100,25 +96,22 @@ pub fn resource_pot_to_runtime_object(
         if context.cache_manager.custom.has_cache(&store_key.name)
           && !context.cache_manager.custom.is_cache_changed(&store_key)
         {
-          let cache = context
-            .cache_manager
-            .custom
-            .read_cache(&store_key.name)
-            .unwrap();
-          let cached_rendered_script_module = deserialize!(&cache, CacheRenderedScriptModule);
-          let module = cached_rendered_script_module.to_magic_string(&context);
+          if let Some(cache) = context.cache_manager.custom.read_cache(&store_key.name) {
+            let cached_rendered_script_module = deserialize!(&cache, CacheRenderedScriptModule);
+            let module = cached_rendered_script_module.to_magic_string(&context);
 
-          modules.lock().push(RenderedScriptModule {
-            module,
-            id: cached_rendered_script_module.id,
-            rendered_module: cached_rendered_script_module.rendered_module,
-            external_modules: cached_rendered_script_module.external_modules,
-          });
-          return Ok(());
+            modules.lock().push(RenderedScriptModule {
+              module,
+              id: cached_rendered_script_module.id,
+              rendered_module: cached_rendered_script_module.rendered_module,
+              external_modules: cached_rendered_script_module.external_modules,
+            });
+            return Ok(());
+          }
         }
       }
 
-      let is_async_module = async_modules.contains(&m_id);
+      let is_async_module = async_modules.contains(m_id);
       let RenderModuleResult {
         rendered_module,
         external_modules,
@@ -127,7 +120,7 @@ pub fn resource_pot_to_runtime_object(
         module,
         module_graph,
         is_enabled_minify,
-        &minify_options,
+        &minify_builder,
         is_async_module,
         context,
       )?;

@@ -29,7 +29,7 @@ export function cleanStack(stack: string) {
 }
 
 export function buildErrorMessage(
-  err: RollupError,
+  err: RollupError & { source: string },
   args: string[] = [],
   includeStack = true
 ): string {
@@ -37,11 +37,12 @@ export function buildErrorMessage(
   const loc = err.loc ? `:${err.loc.line}:${err.loc.column}` : '';
   if (err.id) args.push(`  File: ${colors.cyan(err.id)}${loc}`);
   if (err.frame) args.push(colors.yellow(pad(err.frame)));
+  else if (err.source) args.push(colors.yellow(err.source));
   if (includeStack && err.stack) args.push(pad(cleanStack(err.stack)));
   return args.join('\n');
 }
 
-export function logError(err: Error) {
+export function logError(err: Error, throwErrorFlag = true) {
   let errorMessages: string[] = [];
   try {
     errorMessages = JSON.parse(err.message);
@@ -50,19 +51,26 @@ export function logError(err: Error) {
   }
 
   if (!Array.isArray(errorMessages) || errorMessages.length === 0) {
-    throw new Error(err.message);
+    if (throwErrorFlag) {
+      throw new Error(err.message);
+    }
+    return err.message;
   }
 
-  const formattedErrorMessages = errorMessages.map((errorMsg: any) => {
+  const formattedErrorMessages = errorMessages.map((errorMsg: string) => {
     try {
       const parsedErrorMsg = JSON.parse(errorMsg);
       if (
         parsedErrorMsg &&
         typeof parsedErrorMsg === 'object' &&
-        parsedErrorMsg.message
+        (parsedErrorMsg.message || parsedErrorMsg.reason)
       ) {
         return `${buildErrorMessage(parsedErrorMsg, [
-          colors.red(`Internal server error: ${parsedErrorMsg.message}`)
+          colors.red(
+            `Internal server error: ${
+              parsedErrorMsg.message || parsedErrorMsg.reason
+            }`
+          )
         ])}`;
       } else {
         return colors.red(errorMsg);
@@ -72,7 +80,10 @@ export function logError(err: Error) {
     }
   });
   const errorMessage = formattedErrorMessages.join('\n');
-  throw new Error(errorMessage);
+  if (throwErrorFlag) {
+    throw new Error(errorMessage);
+  }
+  return errorMessage;
 }
 
 // TODO server logger e.g: DevServer.logger.error(msg);

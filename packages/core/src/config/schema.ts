@@ -1,6 +1,6 @@
+import { SecureServerOptions } from 'node:http2';
 import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
-import { SecureServerOptions } from 'node:http2';
 
 import type { UserConfig } from './types.js';
 
@@ -21,7 +21,7 @@ const compilationConfigSchema = z
             'node',
             'node-legacy',
             'node-next',
-            'node-16',
+            'node16',
             'browser-legacy',
             'browser-esnext',
             'browser-es2015',
@@ -45,7 +45,9 @@ const compilationConfigSchema = z
       .strict()
       .optional(),
     define: z.record(z.any()).optional(),
-    external: z.array(z.string()).optional(),
+    external: z
+      .array(z.string().or(z.record(z.string(), z.string())))
+      .optional(),
     externalNodeBuiltins: z
       .union([z.boolean(), z.array(z.string())])
       .optional(),
@@ -69,7 +71,8 @@ const compilationConfigSchema = z
       .object({
         path: z.string().optional(),
         plugins: z.array(z.string()).optional(),
-        swcHelpersPath: z.string().optional()
+        swcHelpersPath: z.string().optional(),
+        isolate: z.boolean().optional()
       })
       .strict()
       .optional(),
@@ -242,11 +245,21 @@ const compilationConfigSchema = z
               hash: z.boolean().optional()
             })
             .optional(),
-          envs: z.record(z.string(), z.string()).optional()
+          envs: z.record(z.string(), z.string()).optional(),
+          globalBuiltinCacheKeyStrategy: z
+            .object({
+              env: z.boolean().optional(),
+              define: z.boolean().optional(),
+              buildDependencies: z.boolean().optional(),
+              lockfile: z.boolean().optional(),
+              packageJson: z.boolean().optional()
+            })
+            .optional()
         })
         .optional()
     ]),
-    comments: z.union([z.boolean(), z.literal('license')]).optional()
+    comments: z.union([z.boolean(), z.literal('license')]).optional(),
+    custom: z.record(z.string(), z.string()).optional()
   })
   .strict();
 
@@ -286,7 +299,8 @@ const FarmConfigSchema = z
               logs: z.any().optional(),
               rewrite: z
                 .function(z.tuple([z.string(), z.object({})]))
-                .optional()
+                .optional(),
+              headers: z.record(z.string()).optional()
             })
           )
           .optional(),

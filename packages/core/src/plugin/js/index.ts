@@ -1,19 +1,20 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { isAbsolute } from 'node:path';
+import { CompilationMode } from '../../config/env.js';
 import {
   type JsPlugin,
-  normalizeDevServerOptions,
+  Logger,
   type UserConfig,
-  Logger
+  normalizeDevServerOptions
 } from '../../index.js';
+import merge from '../../utils/merge.js';
+import { resolveAsyncPlugins } from '../index.js';
 import {
   DEFAULT_FILTERS,
-  getCssModuleType,
-  VITE_PLUGIN_DEFAULT_MODULE_TYPE
+  VITE_PLUGIN_DEFAULT_MODULE_TYPE,
+  getCssModuleType
 } from './utils.js';
 import { VitePluginAdapter } from './vite-plugin-adapter.js';
-import { existsSync, readFileSync } from 'node:fs';
-import { resolveAsyncPlugins } from '../index.js';
-import merge from '../../utils/merge.js';
-import { CompilationMode } from '../../config/env.js';
 
 // export * from './jsPluginAdapter.js';
 export { VitePluginAdapter } from './vite-plugin-adapter.js';
@@ -74,6 +75,18 @@ export async function handleVitePlugins(
             VitePluginAdapter.isFarmInternalVirtualModule(resolvedPath) ||
             !existsSync(resolvedPath)
           ) {
+            // for virtual modules that is not loaded by plugins, it should be treated as empty module
+            // cause vite does not require load, vite can handle requests in middlewares
+            if (!isAbsolute(resolvedPath)) {
+              logger.info(
+                `No plugins load virtual ${resolvedPath} in load hook. Farm load it as "export default await import('/@id/' + '${resolvedPath}');" by default for Vite Compatibility`
+              );
+              return {
+                content: `export default await import('/@id/' + '${resolvedPath}');`,
+                moduleType: 'js'
+              };
+            }
+
             return null;
           }
 

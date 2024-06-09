@@ -8,8 +8,9 @@ use std::{
 
 use farmfe_core::{
   config::{
-    config_regex::ConfigRegex, partial_bundling::PartialBundlingEnforceResourceConfig, Config,
-    ModuleFormat, TargetEnv, FARM_MODULE_SYSTEM,
+    config_regex::ConfigRegex, external::ExternalConfig,
+    partial_bundling::PartialBundlingEnforceResourceConfig, Config, ModuleFormat, TargetEnv,
+    FARM_MODULE_SYSTEM,
   },
   context::CompilationContext,
   enhanced_magic_string::types::SourceMapOptions,
@@ -89,7 +90,10 @@ impl Plugin for FarmPluginRuntime {
 
     config.define.insert(
       "'<@__farm_global_this__@>'".to_string(),
-      serde_json::Value::String(get_farm_global_this(&config.runtime.namespace)),
+      serde_json::Value::String(format!(
+        "{}",
+        get_farm_global_this(&config.runtime.namespace)
+      )),
     );
 
     Ok(Some(()))
@@ -346,7 +350,7 @@ impl Plugin for FarmPluginRuntime {
           resource_pot_to_runtime_object(resource_pot, &module_graph, async_modules, context)?;
 
         bundle.prepend(
-          r#"(function(r,e){var t={};function n(r){return Promise.resolve(o(r))}function o(e){if(t[e])return t[e].exports;var i={id:e,exports:{}};r[e](i,i.exports,o,n);t[e]=i;return i.exports}o(e)})("#,
+          r#"(function(r,e){var t={};function n(r){return Promise.resolve(o(r))}function o(e){if(t[e])return t[e].exports;var i={id:e,exports:{}};t[e]=i;r[e](i,i.exports,o,n);return i.exports}o(e)})("#,
         );
 
         bundle.append(
@@ -386,6 +390,7 @@ impl Plugin for FarmPluginRuntime {
       let async_modules = self.get_async_modules(context);
       let async_modules = async_modules.downcast_ref::<HashSet<ModuleId>>().unwrap();
       let module_graph = context.module_graph.read();
+      let external_config = ExternalConfig::from(&*context.config);
       let RenderedJsResourcePot {
         mut bundle,
         rendered_modules,
@@ -425,7 +430,7 @@ impl Plugin for FarmPluginRuntime {
             .into_iter()
             .map(
               |(name, source)| if context.config.output.format == ModuleFormat::EsModule {
-                format!("{source:?}: {{...{name},__esModule:true}}")
+                format!("{source:?}: {name} && {name}.default && !{name}.__esModule ? {{...{name},__esModule:true}} : {name}")
               } else {
                 format!("{source:?}: {name}")
               }
@@ -438,21 +443,26 @@ impl Plugin for FarmPluginRuntime {
       } else if !external_modules.is_empty()
         && context.config.output.target_env == TargetEnv::Browser
       {
+        let mut external_objs = Vec::new();
+
+        for source in external_modules {
+          let replace_source = external_config
+            .find_match(&source)
+            .map(|v| v.source(&source))
+            // it's maybe from plugin
+            .unwrap_or(source.clone());
+
+          let source_obj = format!("(globalThis||window||{{}})['{}']||{{}}", replace_source);
+          external_objs.push(if context.config.output.format == ModuleFormat::EsModule {
+            format!("{source:?}: ({source_obj}).default && !({source_obj}).__esModule ? {{...({source_obj}),__esModule:true}} : ({source_obj})")
+          } else {
+            format!("{source:?}: {source_obj}")
+          });
+        }
+
         let prepend_str = format!(
           "{farm_global_this}.{FARM_MODULE_SYSTEM}.setExternalModules({{{}}});",
-          external_modules
-            .into_iter()
-            .map(|source| {
-              // TODO: make window['{source}'] configurable.
-              let source_obj = format!("(globalThis||window||{{}})['{}']||{{}}", source);
-              if context.config.output.format == ModuleFormat::EsModule {
-                format!("{source:?}: {{...({source_obj}),__esModule:true}}")
-              } else {
-                format!("{source:?}: {source_obj}")
-              }
-            })
-            .collect::<Vec<_>>()
-            .join(",")
+          external_objs.join(",")
         );
         external_modules_str = Some(prepend_str);
       }
@@ -546,6 +556,7 @@ impl Plugin for FarmPluginRuntime {
     context: &Arc<CompilationContext>,
   ) -> farmfe_core::error::Result<Option<()>> {
     handle_entry_resources::handle_entry_resources(param.resources_map, context);
+
     Ok(Some(()))
   }
 }

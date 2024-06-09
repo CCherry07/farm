@@ -1,54 +1,59 @@
+import type { ResolvedUserConfig, UserConfig } from '../../config/types.js';
+import type { Server } from '../../server/index.js';
 import {
-  JsPlugin,
   CompilationContext,
-  PluginRenderResourcePotParams,
+  CompilationContextEmitFileParams,
+  JsPlugin,
   PluginFinalizeResourcesHookParams,
-  ResourcePotInfo,
-  Resource
+  PluginRenderResourcePotParams,
+  Resource,
+  ResourcePotInfo
 } from '../type.js';
 import {
+  FARM_CSS_MODULES_SUFFIX,
+  VITE_PLUGIN_DEFAULT_MODULE_TYPE,
   convertEnforceToPriority,
   customParseQueryString,
+  decodeStr,
+  encodeStr,
   formatId,
   formatLoadModuleType,
   formatTransformModuleType,
   getContentValue,
   isObject,
+  isStartsWithSlash,
   isString,
-  encodeStr,
-  decodeStr,
-  FARM_CSS_MODULES_SUFFIX,
+  normalizeAdapterVirtualModule,
+  normalizePath,
+  removeQuery,
+  revertNormalizePath,
   transformFarmConfigToRollupNormalizedOutputOptions,
   transformResourceInfo2RollupRenderedChunk,
-  transformRollupResource2FarmResource,
-  VITE_PLUGIN_DEFAULT_MODULE_TYPE,
-  normalizePath,
-  revertNormalizePath,
-  normalizeAdapterVirtualModule,
-  isStartsWithSlash,
-  removeQuery
+  transformRollupResource2FarmResource
 } from './utils.js';
-import type { ResolvedUserConfig, UserConfig } from '../../config/types.js';
-import type { Server } from '../../server/index.js';
 
 // only use types from vite and we do not install vite as a dependency
 import type {
-  Plugin,
-  UserConfig as ViteUserConfig,
+  ConfigEnv,
   HmrContext,
-  ViteDevServer,
   ModuleNode,
-  ConfigEnv
+  Plugin,
+  ViteDevServer,
+  UserConfig as ViteUserConfig
 } from 'vite';
 
-import type {
-  ResolveIdResult,
-  RenderChunkHook,
-  OutputBundle,
-  FunctionPluginHooks
-} from 'rollup';
 import path from 'path';
 import fse from 'fs-extra';
+import { readFile } from 'fs/promises';
+import type {
+  FunctionPluginHooks,
+  OutputBundle,
+  RenderChunkHook,
+  ResolveIdResult
+} from 'rollup';
+import { VIRTUAL_FARM_DYNAMIC_IMPORT_SUFFIX } from '../../compiler/index.js';
+import { CompilationMode } from '../../config/env.js';
+import { Logger } from '../../index.js';
 import {
   Config,
   PluginLoadHookParam,
@@ -57,28 +62,24 @@ import {
   PluginResolveHookResult,
   PluginTransformHookParam,
   PluginTransformHookResult
-} from '../../../binding/index.js';
-import { readFile } from 'fs/promises';
-import {
-  ViteDevServerAdapter,
-  ViteModuleGraphAdapter,
-  createViteDevServerAdapter
-} from './vite-server-adapter.js';
-import { farmContextToViteContext } from './farm-to-vite-context.js';
+} from '../../types/binding.js';
+import merge from '../../utils/merge.js';
+import { applyHtmlTransform } from './apply-html-transform.js';
 import {
   farmUserConfigToViteConfig,
   proxyViteConfig,
   viteConfigToFarmConfig
 } from './farm-to-vite-config.js';
-import { VIRTUAL_FARM_DYNAMIC_IMPORT_PREFIX } from '../../compiler/index.js';
+import { farmContextToViteContext } from './farm-to-vite-context.js';
 import {
-  transformResourceInfo2RollupResource,
-  transformFarmConfigToRollupNormalizedInputOptions
+  transformFarmConfigToRollupNormalizedInputOptions,
+  transformResourceInfo2RollupResource
 } from './utils.js';
-import { Logger } from '../../index.js';
-import { applyHtmlTransform } from './apply-html-transform.js';
-import merge from '../../utils/merge.js';
-import { CompilationMode } from '../../config/env.js';
+import {
+  ViteDevServerAdapter,
+  ViteModuleGraphAdapter,
+  createViteDevServerAdapter
+} from './vite-server-adapter.js';
 
 type OmitThis<T extends (this: any, ...args: any[]) => any> = T extends (
   this: any,
@@ -284,8 +285,16 @@ export class VitePluginAdapter implements JsPlugin {
     if (hook) {
       await hook(this._viteDevServer);
       this._viteDevServer.middlewareCallbacks.forEach((cb) => {
-        devServer.app().use((ctx, next) => {
-          return cb(ctx.req, ctx.res, next);
+        devServer.app().use((ctx, koaNext) => {
+          return new Promise((resolve, reject) => {
+            // koaNext is async, but vite's next is sync, we need a adapter here
+            const next = (err: Error) => {
+              if (err) reject(err);
+              koaNext().then(resolve);
+            };
+
+            return cb(ctx.req, ctx.res, next);
+          });
         });
       });
     }
@@ -526,7 +535,8 @@ export class VitePluginAdapter implements JsPlugin {
     // default module type and asset can be transformed by vite transform hook
     const moduleTypesCouldTransform = [
       VITE_PLUGIN_DEFAULT_MODULE_TYPE,
-      'asset'
+      'asset',
+      'json'
     ];
     return {
       filters: {
@@ -635,7 +645,7 @@ export class VitePluginAdapter implements JsPlugin {
                     ...m,
                     id: normalizePath(m.id),
                     file: normalizePath(m.file)
-                  } as ModuleNode)
+                  }) as ModuleNode
               ),
               read: function (): string | Promise<string> {
                 return readFile(file, 'utf-8');
@@ -741,6 +751,16 @@ export class VitePluginAdapter implements JsPlugin {
     return {
       executor: this.wrapExecutor(
         async (param: PluginFinalizeResourcesHookParams, context) => {
+          // Fix resourcesMap deadlock called by emitFile.
+          // Cause Farm called resourcesMap.lock() before calling this hook, and this.emitFile would call resourcesMap.lock()
+          // this leads to deadlock when calling emitFile in finalize_resources hook.
+          // so we hack context.emitFile here to avoid deadlock
+          const emittedFiles: CompilationContextEmitFileParams[] = [];
+          context.emitFile = async (
+            params: CompilationContextEmitFileParams
+          ) => {
+            emittedFiles.push(params);
+          };
           const hook = this.wrapRawPluginHook(
             'generateBundle',
             this._rawPlugin.generateBundle,
@@ -760,13 +780,30 @@ export class VitePluginAdapter implements JsPlugin {
             bundles
           );
 
+          const emittedFilesMap = emittedFiles.reduce(
+            (res, item) => {
+              res[item.name] = {
+                name: item.name,
+                bytes: item.content,
+                emitted: false,
+                resourceType: 'asset',
+                origin: {
+                  type: 'Module',
+                  value: 'vite-plugin-adapter-generate-bundle-hook'
+                }
+              };
+              return res;
+            },
+            {} as PluginFinalizeResourcesHookParams['resourcesMap']
+          );
+
           const result = Object.entries(bundles).reduce((res, [key, val]) => {
             res[key] = transformRollupResource2FarmResource(
               val,
               param.resourcesMap[key]
             );
             return res;
-          }, {} as PluginFinalizeResourcesHookParams['resourcesMap']);
+          }, emittedFilesMap);
 
           return result;
         }
@@ -875,7 +912,7 @@ export class VitePluginAdapter implements JsPlugin {
   // skip farm lazy compilation virtual module for vite plugin
   public static isFarmInternalVirtualModule(id: string) {
     return (
-      id.startsWith(VIRTUAL_FARM_DYNAMIC_IMPORT_PREFIX) ||
+      id.endsWith(VIRTUAL_FARM_DYNAMIC_IMPORT_SUFFIX) ||
       // css has been handled before the virtual module is created
       FARM_CSS_MODULES_SUFFIX.test(id)
     );

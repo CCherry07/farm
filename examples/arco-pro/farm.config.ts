@@ -11,7 +11,7 @@ export default defineConfig(async (env) => {
       },
       // minify: false,
       presetEnv: false,
-      persistentCache: false,
+      // persistentCache: false,
       resolve: {
         symlinks: true,
         alias: {
@@ -22,6 +22,7 @@ export default defineConfig(async (env) => {
       },
       minify: false,
       mode: 'development',
+      persistentCache: false,
       output: {
         path: './build',
         filename: 'assets/[resourceName].[contentHash].[ext]',

@@ -1,5 +1,24 @@
 # create-farm
 
+## 1.6.9
+
+### Patch Changes
+
+- a591f689: feat(create-farm): add vue2 template
+
+## 1.6.8
+
+### Patch Changes
+
+- f5b77216: update choose framework ways
+
+## 1.6.7
+
+### Patch Changes
+
+- 73570318: chore(deps): update farmfe-packages
+- db61cb49: feat: add tauri template
+
 ## 1.6.6
 
 ### Patch Changes

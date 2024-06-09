@@ -102,15 +102,17 @@ See [Contributing Guide](https://github.com/farm-fe/farm/blob/main/CONTRIBUTING.
 
 ## Chat With Us
 
-- [Author Twitter](https://twitter.com/brightwwu46799), [Official Twitter](https://twitter.com/fe_farm)
+- [Author Twitter](https://twitter.com/brightwwu46799), [Official Twitter](https://twitter.com/FarmFe71928)
 
 - With [Discord](https://discord.gg/mDErq9aFnF)
 
 - Wechat group
 
-<br><img src="https://github.com/farm-fe/farm/assets/66500121/0025b8b6-9519-4870-b724-0a1f3cee3797" width="30%" />
+<br><img src="https://github.com/ErKeLost/farm-nestjs/assets/66500121/f353581b-cdd1-45ee-9e17-efa202d672cf" width="30%" />
 
+- QQ group
 
+<br><img src="https://github.com/ErKeLost/react/assets/66500121/a9312045-584b-44fa-87b3-2827372ae849" width="30%" />
 
 ## Contributors
 

@@ -1,5 +1,17 @@
 # @farmfe/runtime
 
+## 0.11.1
+
+### Patch Changes
+
+- 492353f8: fix: lazy compilation concurrency issue
+
+## 0.11.0
+
+### Minor Changes
+
+- ef1b39bc: Top level await supported
+
 ## 0.10.0
 
 ### Minor Changes

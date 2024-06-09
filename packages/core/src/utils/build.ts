@@ -1,12 +1,13 @@
 import { performance } from 'node:perf_hooks';
 import { Logger } from './logger.js';
 
-import { PersistentCacheBrand, bold, green } from './color.js';
 import {
   FARM_TARGET_NODE_ENVS,
   ResolvedUserConfig,
   clearScreen
 } from '../index.js';
+import { logError } from '../server/error.js';
+import { PersistentCacheBrand, bold, green } from './color.js';
 
 interface CompilerHandlerOptions {
   clear?: boolean;
@@ -15,6 +16,7 @@ interface CompilerHandlerOptions {
 export async function compilerHandler(
   callback: () => Promise<void>,
   config: ResolvedUserConfig,
+  logger: Logger,
   options?: CompilerHandlerOptions
 ) {
   const IS_TARGET_NODE = FARM_TARGET_NODE_ENVS.includes(
@@ -22,13 +24,12 @@ export async function compilerHandler(
   );
   IS_TARGET_NODE && options?.clear && clearScreen();
   const { persistentCache, output } = config.compilation;
-  const logger = new Logger();
   const startTime = performance.now();
 
   try {
     await callback();
   } catch (error) {
-    logger.error(error, { exit: true });
+    logger.error(`Compiler ${logError(error, false)}`);
     return;
   }
 
